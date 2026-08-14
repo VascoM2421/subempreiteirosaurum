@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Subempreiteiros — AURUM</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="ecra-login" class="login-ecra">
+  <div class="login-caixa">
+    <img src="logo.svg" alt="AURUM" class="logo">
+    <h1>Portal de Subempreiteiros</h1>
+    <p class="subtitulo">Carrega aqui os documentos da tua empresa e dos teus trabalhadores.</p>
+    <form id="form-login">
+      <label>Utilizador
+        <input type="text" id="login-username" autocomplete="username">
+      </label>
+      <label>Password
+        <input type="password" id="login-password" autocomplete="current-password">
+      </label>
+      <div class="erro" id="login-erro"></div>
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+    <button type="button" class="login-link-admin" id="btn-mostrar-login-admin">Entrar como AURUM (administração)</button>
+    <form id="form-login-admin" hidden>
+      <label>Password de administração
+        <input type="password" id="login-admin-password" autocomplete="current-password">
+      </label>
+      <div class="erro" id="login-admin-erro"></div>
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<div id="app-subempreiteiro" hidden>
+  <header class="app-header">
+    <div class="marca">
+      <img src="logo.svg" alt="AURUM" class="logo">
+      <div>
+        <h1 id="sub-nome-header">—</h1>
+        <p class="subtitulo">Portal de Subempreiteiros AURUM</p>
+      </div>
+    </div>
+    <div class="header-acoes">
+      <button class="btn btn-secondary btn-sm" id="btn-sub-logout">Sair</button>
+    </div>
+  </header>
+  <div id="banner-validade-sub" class="banner-alerta banner-alerta-vermelho" hidden></div>
+  <main>
+    <section class="secao">
+      <div class="secao-header">
+        <h2>Os Nossos Documentos</h2>
+      </div>
+      <div id="empresa-docs" class="docs-grid"></div>
+    </section>
+
+    <section class="secao">
+      <div class="secao-header">
+        <h2>Trabalhadores</h2>
+      </div>
+      <div class="trabalhadores-layout">
+        <aside class="trabalhadores-lista">
+          <button id="btn-novo-trabalhador" class="btn btn-primary btn-sm btn-block">+ Adicionar trabalhador</button>
+          <form id="form-novo-trabalhador" class="form-novo-trabalhador" hidden>
+            <input type="text" id="input-novo-trabalhador" placeholder="Nome do trabalhador" autocomplete="off">
+            <div class="form-novo-colaborador-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+              <button type="button" id="btn-cancelar-novo-trabalhador" class="btn btn-secondary btn-sm">Cancelar</button>
+            </div>
+          </form>
+          <ul id="lista-trabalhadores"></ul>
+        </aside>
+        <div class="trabalhador-detalhe" id="trabalhador-detalhe">
+          <p class="estado-vazio">Selecione ou adicione um trabalhador para gerir os seus documentos.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="app-admin" hidden>
+  <header class="app-header">
+    <div class="marca">
+      <img src="logo.svg" alt="AURUM" class="logo">
+      <div>
+        <h1>Administração — Subempreiteiros</h1>
+        <p class="subtitulo">Painel interno AURUM</p>
+      </div>
+    </div>
+    <div class="header-acoes">
+      <button class="btn btn-secondary btn-sm" id="btn-admin-logout">Sair</button>
+    </div>
+  </header>
+  <main>
+    <section class="secao">
+      <div class="secao-header">
+        <h2>Subempreiteiros</h2>
+        <button id="btn-novo-subempreiteiro" class="btn btn-primary btn-sm">+ Novo subempreiteiro</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="admin-tabela" id="tabela-subempreiteiros">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Utilizador</th>
+              <th>Estado</th>
+              <th>Trabalhadores</th>
+              <th>Em falta</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-subempreiteiros-corpo"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="modal-overlay" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <p id="modal-mensagem"></p>
+    <div class="modal-actions">
+      <button id="modal-btn-confirmar" class="btn btn-danger btn-sm">Confirmar</button>
+      <button id="modal-btn-cancelar" class="btn btn-secondary btn-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-novo-subempreiteiro" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <p>Novo subempreiteiro</p>
+    <label>Nome
+      <input type="text" id="input-novo-subempreiteiro-nome" autocomplete="off">
+    </label>
+    <div class="modal-actions">
+      <button id="btn-guardar-novo-subempreiteiro" class="btn btn-primary btn-sm">Criar</button>
+      <button id="btn-fechar-novo-subempreiteiro" class="btn btn-secondary btn-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-credenciais" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <p id="modal-credenciais-titulo">Definir credenciais</p>
+    <label>Utilizador
+      <input type="text" id="input-credenciais-username" autocomplete="off">
+    </label>
+    <label>Password
+      <input type="text" id="input-credenciais-password" autocomplete="off">
+    </label>
+    <div class="modal-actions">
+      <button id="btn-guardar-credenciais" class="btn btn-primary btn-sm">Guardar</button>
+      <button id="btn-fechar-credenciais" class="btn btn-secondary btn-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="trocar-password-overlay" class="trocar-password-overlay" hidden>
+  <div class="modal-box">
+    <p>Esta é a primeira vez que entras, ou a tua password foi reposta pela AURUM. Define uma password nova antes de continuar.</p>
+    <label>Password atual (a que te foi dada)
+      <input type="password" id="input-password-atual" autocomplete="current-password">
+    </label>
+    <label>Nova password (mínimo 6 caracteres)
+      <input type="password" id="input-password-nova" autocomplete="new-password">
+    </label>
+    <div class="erro" id="trocar-password-erro"></div>
+    <div class="modal-actions">
+      <button id="btn-guardar-nova-password" class="btn btn-primary btn-sm">Guardar e continuar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

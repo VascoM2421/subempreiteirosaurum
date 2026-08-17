@@ -13,9 +13,25 @@ const EMPRESA_DOCS = [
   { key: 'certidao_seg_social', label: 'Certidão de não Dívida à Segurança Social' },
   { key: 'certidao_financas', label: 'Certidão de não Dívida às Finanças' },
   { key: 'certidao_permanente', label: 'Certidão Permanente' },
-  { key: 'declaracao_remuneracoes', label: 'Declaração de Remunerações' },
-  { key: 'comprovativo_tsu', label: 'Comprovativo de Pagamento de TSU' },
+  { key: 'declaracao_remuneracoes', label: 'Declaração de Remunerações', mensal: true },
+  { key: 'comprovativo_tsu', label: 'Comprovativo de Pagamento de TSU', mensal: true },
 ];
+
+const MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+// Documentos mensais (declaração de remunerações, TSU) referem-se ao mês anterior até este
+// dia do mês — o contabilista só costuma ter estes documentos prontos depois de o mês
+// fechar. A partir deste dia, já se pede o do mês atual.
+const DIA_TROCA_MES_DOCS_MENSAIS = 20;
+
+// Devolve o rótulo do documento, com o mês incluído para os documentos mensais
+// (ex: "Declaração de Remunerações de junho"). Os restantes documentos ficam inalterados.
+function labelDocEmpresa(tipo, hoje) {
+  if (!tipo.mensal) return tipo.label;
+  const mesAtual = hoje.getMonth();
+  const mes = hoje.getDate() >= DIA_TROCA_MES_DOCS_MENSAIS ? mesAtual : (mesAtual + 11) % 12;
+  return `${tipo.label} de ${MESES_PT[mes]}`;
+}
 
 const TRABALHADOR_DOCS = [
   { key: 'cartao_cidadao', label: 'Cartão de Cidadão', obrigatorio: true },
@@ -58,4 +74,5 @@ module.exports = {
   isEmpresaDocKey,
   isTrabalhadorDocKey,
   docTrabalhadorObrigatorio,
+  labelDocEmpresa,
 };

@@ -265,8 +265,9 @@ async function iniciarComoSubempreiteiro() {
   $('#app-admin').hidden = true;
   $('#app-subempreiteiro').hidden = false;
   $('#sub-nome-header').textContent = eu.nome;
+  $('#banner-como-admin').hidden = !eu.comoAdmin;
 
-  $('#trocar-password-overlay').hidden = Boolean(eu.passwordAlterada);
+  $('#trocar-password-overlay').hidden = Boolean(eu.passwordAlterada) || Boolean(eu.comoAdmin);
 
   renderEmpresaDocs();
   renderListaTrabalhadores();
@@ -454,6 +455,18 @@ async function carregarAdmin() {
   renderTabelaAdmin();
 }
 
+// Um formulário com target="_blank" abre sempre num separador novo sem ser bloqueado pelo
+// browser (ao contrário de window.open() depois de um pedido assíncrono).
+function entrarComoSubempreiteiro(id) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/api/admin/subempreiteiros/${id}/entrar-como`;
+  form.target = '_blank';
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
 function renderTabelaAdmin() {
   const corpo = $('#tabela-subempreiteiros-corpo');
   corpo.innerHTML = '';
@@ -471,7 +484,16 @@ function renderTabelaAdmin() {
       <td class="admin-acoes"></td>
     `;
     const acoes = tr.querySelector('.admin-acoes');
+    const btnEntrar = document.createElement('button');
+    btnEntrar.className = 'btn btn-secondary btn-sm';
+    btnEntrar.textContent = 'Entrar como';
+    btnEntrar.title = 'Ver e gerir esta conta como se fosses o subempreiteiro';
+    btnEntrar.disabled = !s.ativo;
+    btnEntrar.addEventListener('click', () => entrarComoSubempreiteiro(s.id));
+    acoes.appendChild(btnEntrar);
+
     const btnCred = document.createElement('button');
+    btnCred.style.marginLeft = '6px';
     btnCred.className = 'btn btn-secondary btn-sm';
     btnCred.textContent = s.temCredenciais ? 'Repor password' : 'Definir credenciais';
     btnCred.addEventListener('click', () => abrirModalCredenciais(s));

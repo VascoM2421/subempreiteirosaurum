@@ -17,6 +17,7 @@ const {
   isEmpresaDocKey,
   isTrabalhadorDocKey,
   docTrabalhadorObrigatorio,
+  labelDocEmpresa,
 } = require('./subDocTypes');
 
 const EM_PRODUCAO = process.env.NODE_ENV === 'production';
@@ -148,6 +149,7 @@ function exigirSubempreiteiro(req, res, next) {
   const sub = db.subempreiteiros[sessao.subempreiteiroId];
   if (!sub || !sub.ativo) return res.status(401).json({ erro: 'Conta inválida ou desativada. Contacta a AURUM.' });
   req.subempreiteiroId = sessao.subempreiteiroId;
+  req.comoAdmin = Boolean(sessao.comoAdmin);
   next();
 }
 function exigirAdmin(req, res, next) {
@@ -311,7 +313,7 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/eu', exigirSubempreiteiro, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.subempreiteiroId];
-  res.json({ nome: sub.nome, passwordAlterada: Boolean(sub.passwordAlterada), docs: sub.docs || {} });
+  res.json({ nome: sub.nome, passwordAlterada: Boolean(sub.passwordAlterada), docs: sub.docs || {}, comoAdmin: req.comoAdmin });
 });
 
 app.post('/api/alterar-password', exigirSubempreiteiro, (req, res) => {
@@ -355,8 +357,9 @@ app.get('/api/admin/eu', exigirAdmin, (_req, res) => res.json({ ok: true }));
 
 // ---------- Config (tipos de documento) ----------
 app.get('/api/config', (_req, res) => {
+  const hoje = new Date();
   res.json({
-    empresaDocs: EMPRESA_DOCS,
+    empresaDocs: EMPRESA_DOCS.map((d) => ({ ...d, label: labelDocEmpresa(d, hoje) })),
     trabalhadorDocs: TRABALHADOR_DOCS,
     empresaDocsComValidade: EMPRESA_DOCS_COM_VALIDADE,
     trabalhadorDocsComValidade: TRABALHADOR_DOCS_COM_VALIDADE,
@@ -582,7 +585,8 @@ app.delete('/api/trabalhadores/:tid/docs/:docKey/:fileId', exigirSubempreiteiro,
 // ================= ADMIN (AURUM) =================
 
 function resumoFaltas(sub) {
-  const faltamEmpresa = EMPRESA_DOCS.filter((d) => !docPreenchido(sub.docs, d.key)).map((d) => d.label);
+  const hoje = new Date();
+  const faltamEmpresa = EMPRESA_DOCS.filter((d) => !docPreenchido(sub.docs, d.key)).map((d) => labelDocEmpresa(d, hoje));
   const trabalhadoresComFalta = (sub.trabalhadores || [])
     .map((t) => ({
       nome: t.nome,
@@ -654,6 +658,20 @@ app.patch('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
   if (req.body && req.body.ativo !== undefined) sub.ativo = Boolean(req.body.ativo);
   writeDb(db);
   res.json(sub);
+});
+
+// Permite à administração ver/gerir a conta de um subempreiteiro sem saber a password dele
+// (útil para ajudar ou verificar o que já foi carregado). Usa um formulário com
+// target="_blank" no frontend em vez de window.open — assim o browser nunca bloqueia o
+// separador novo (só bloqueia window.open() invocado depois de um pedido assíncrono).
+app.post('/api/admin/subempreiteiros/:id/entrar-como', exigirAdmin, (req, res) => {
+  const db = readDb();
+  const sub = db.subempreiteiros[req.params.id];
+  if (!sub) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
+  if (!sub.ativo) return res.status(400).json({ erro: 'Este subempreiteiro está desativado.' });
+  const token = criarSessao({ tipo: 'subempreiteiro', subempreiteiroId: sub.id, comoAdmin: true });
+  definirCookie(res, COOKIE_SUB, token, { maxAgeMs: SESSAO_DURACAO_MS });
+  res.redirect(302, '/');
 });
 
 app.delete('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {

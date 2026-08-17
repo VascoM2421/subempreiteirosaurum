@@ -718,9 +718,20 @@ app.get('/api/admin/subempreiteiros/:id/export', exigirAdmin, (req, res) => {
 });
 
 // ---------- Frontend estático ----------
+// index.html/app.js/styles.css nunca ficam em cache — sem isto, o browser de quem usa a app
+// pode continuar a mostrar uma versão antiga da interface depois de um deploy novo, mesmo
+// que o servidor já tenha o código atualizado (aconteceu: o browser não voltava a pedir o
+// ficheiro ao servidor). Ficheiros que raramente mudam (logo.png) continuam com cache normal.
+const SEM_CACHE = new Set(['/index.html', '/', '/app.js', '/styles.css']);
+app.use((req, res, next) => {
+  if (SEM_CACHE.has(req.path)) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

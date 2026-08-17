@@ -174,6 +174,14 @@ function writeDb(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
+// Diagnóstico de arranque: se isto disser "ficheiro NOVO" a cada deploy, o disco persistente
+// do Render não está a funcionar (não está montado, ou está montado noutro caminho) — os
+// dados desaparecem sempre que o serviço reinicia. Confirma em Render → o teu serviço →
+// Disks, que existe um disco montado exatamente em DATA_DIR (valor impresso abaixo).
+const dbJaExistia = fs.existsSync(DB_PATH);
+console.log(`[arranque] DATA_DIR = ${DATA_DIR}`);
+console.log(`[arranque] db.json ${dbJaExistia ? 'já existia (disco persistente OK)' : 'é NOVO — o disco persistente pode não estar configurado'}`);
+
 ensureDirs();
 
 // Semear os subempreiteiros já conhecidos da Financeira, só se ainda não existirem.

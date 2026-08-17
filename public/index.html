@@ -10,34 +10,40 @@
 
 <div id="ecra-login" class="login-ecra">
   <div class="login-caixa">
-    <img src="logo.svg" alt="AURUM" class="logo">
-    <h1>Portal de Subempreiteiros</h1>
-    <p class="subtitulo">Carrega aqui os documentos da tua empresa e dos teus trabalhadores.</p>
-    <form id="form-login">
-      <label>Utilizador
-        <input type="text" id="login-username" autocomplete="username">
-      </label>
-      <label>Password
-        <input type="password" id="login-password" autocomplete="current-password">
-      </label>
-      <div class="erro" id="login-erro"></div>
-      <button type="submit" class="btn btn-primary">Entrar</button>
-    </form>
-    <button type="button" class="login-link-admin" id="btn-mostrar-login-admin">Entrar como AURUM (administração)</button>
-    <form id="form-login-admin" hidden>
-      <label>Password de administração
-        <input type="password" id="login-admin-password" autocomplete="current-password">
-      </label>
-      <div class="erro" id="login-admin-erro"></div>
-      <button type="submit" class="btn btn-primary">Entrar</button>
-    </form>
+    <img src="logo.png" alt="AURUM" class="logo">
+    <div id="login-normal">
+      <h1>Portal de Subempreiteiros</h1>
+      <p class="subtitulo">Carrega aqui os documentos da tua empresa e dos teus trabalhadores.</p>
+      <form id="form-login">
+        <label>Utilizador
+          <input type="text" id="login-username" autocomplete="username">
+        </label>
+        <label>Password
+          <input type="password" id="login-password" autocomplete="current-password">
+        </label>
+        <div class="erro" id="login-erro"></div>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+      <button type="button" class="login-link-admin" id="btn-mostrar-login-admin">Entrar como AURUM (administração)</button>
+    </div>
+    <div id="login-admin-bloco" hidden>
+      <h1>Administração AURUM</h1>
+      <p class="subtitulo">Portal de Subempreiteiros</p>
+      <form id="form-login-admin">
+        <label>Password de administração
+          <input type="password" id="login-admin-password" autocomplete="current-password">
+        </label>
+        <div class="erro" id="login-admin-erro"></div>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
   </div>
 </div>
 
 <div id="app-subempreiteiro" hidden>
   <header class="app-header">
     <div class="marca">
-      <img src="logo.svg" alt="AURUM" class="logo">
+      <img src="logo.png" alt="AURUM" class="logo">
       <div>
         <h1 id="sub-nome-header">—</h1>
         <p class="subtitulo">Portal de Subempreiteiros AURUM</p>
@@ -83,7 +89,7 @@
 <div id="app-admin" hidden>
   <header class="app-header">
     <div class="marca">
-      <img src="logo.svg" alt="AURUM" class="logo">
+      <img src="logo.png" alt="AURUM" class="logo">
       <div>
         <h1>Administração — Subempreiteiros</h1>
         <p class="subtitulo">Painel interno AURUM</p>

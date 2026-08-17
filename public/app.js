@@ -217,8 +217,7 @@ $('#form-login').addEventListener('submit', async (e) => {
 });
 
 $('#btn-mostrar-login-admin').addEventListener('click', () => {
-  const form = $('#form-login-admin');
-  form.hidden = !form.hidden;
+  window.open('/admin', '_blank');
 });
 
 $('#form-login-admin').addEventListener('submit', async (e) => {
@@ -542,13 +541,22 @@ $('#btn-guardar-novo-subempreiteiro').addEventListener('click', async () => {
 // ---------- Arranque ----------
 
 (async function iniciar() {
+  const ehPathAdmin = window.location.pathname.replace(/\/+$/, '') === '/admin';
+
+  if (ehPathAdmin) {
+    $('#login-normal').hidden = true;
+    $('#login-admin-bloco').hidden = false;
+    try {
+      await iniciarComoAdmin();
+      return;
+    } catch (e) { /* não autenticado como admin */ }
+    $('#ecra-login').hidden = false;
+    return;
+  }
+
   try {
     await iniciarComoSubempreiteiro();
     return;
   } catch (e) { /* não autenticado como subempreiteiro */ }
-  try {
-    await iniciarComoAdmin();
-    return;
-  } catch (e) { /* não autenticado como admin */ }
   $('#ecra-login').hidden = false;
 })();

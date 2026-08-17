@@ -40,6 +40,15 @@ body {
   gap: 14px;
 }
 
+.logo {
+  border-radius: 50%;
+  background: var(--branco);
+  object-fit: contain;
+  padding: 3px;
+  box-shadow: 0 1px 5px rgba(120, 95, 20, 0.18);
+  flex: none;
+}
+
 .app-header .logo {
   height: 48px;
   width: 48px;

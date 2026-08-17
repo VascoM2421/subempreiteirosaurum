@@ -216,9 +216,6 @@ $('#form-login').addEventListener('submit', async (e) => {
   }
 });
 
-$('#btn-mostrar-login-admin').addEventListener('click', () => {
-  window.open('/admin', '_blank');
-});
 
 $('#form-login-admin').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -415,19 +412,24 @@ async function removerTrabalhador(trabalhador) {
   } catch (err) { toast(err.message, true); }
 }
 
-$('#btn-novo-trabalhador').addEventListener('click', () => {
-  $('#form-novo-trabalhador').hidden = false;
-  $('#input-novo-trabalhador').value = '';
-  $('#input-novo-trabalhador').focus();
-});
-$('#btn-cancelar-novo-trabalhador').addEventListener('click', () => { $('#form-novo-trabalhador').hidden = true; });
+function mostrarFormNovoTrabalhador(mostrar) {
+  $('#form-novo-trabalhador').hidden = !mostrar;
+  $('#btn-novo-trabalhador').hidden = mostrar;
+  if (mostrar) {
+    $('#input-novo-trabalhador').value = '';
+    $('#input-novo-trabalhador').focus();
+  }
+}
+
+$('#btn-novo-trabalhador').addEventListener('click', () => mostrarFormNovoTrabalhador(true));
+$('#btn-cancelar-novo-trabalhador').addEventListener('click', () => mostrarFormNovoTrabalhador(false));
 $('#form-novo-trabalhador').addEventListener('submit', async (e) => {
   e.preventDefault();
   const nome = $('#input-novo-trabalhador').value.trim();
   if (!nome) { toast('Indica o nome do trabalhador.', true); return; }
   try {
     const novo = await api('/api/trabalhadores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
-    $('#form-novo-trabalhador').hidden = true;
+    mostrarFormNovoTrabalhador(false);
     await carregarTrabalhadores();
     selecionadoTrabalhadorId = novo.id;
     renderListaTrabalhadores();

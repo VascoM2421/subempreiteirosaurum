@@ -3,7 +3,7 @@
 // pastas das outras apps AURUM).
 
 const EMPRESA_DOCS = [
-  { key: 'alvara', label: 'Alvará' },
+  { key: 'alvara', label: 'Alvará/Certificado' },
   { key: 'apolice_at', label: 'Apólice de Seguro de Acidentes de Trabalho' },
   { key: 'recibo_at', label: 'Recibo de Seguro de Acidentes de Trabalho' },
   { key: 'apolice_rc', label: 'Apólice de Seguro de Responsabilidade Civil' },
@@ -13,6 +13,8 @@ const EMPRESA_DOCS = [
   { key: 'certidao_seg_social', label: 'Certidão de não Dívida à Segurança Social' },
   { key: 'certidao_financas', label: 'Certidão de não Dívida às Finanças' },
   { key: 'certidao_permanente', label: 'Certidão Permanente' },
+  { key: 'declaracao_remuneracoes', label: 'Declaração de Remunerações' },
+  { key: 'comprovativo_tsu', label: 'Comprovativo de Pagamento de TSU' },
 ];
 
 const TRABALHADOR_DOCS = [

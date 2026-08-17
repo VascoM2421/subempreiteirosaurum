@@ -1,12 +1,12 @@
-# Portal de Subempreiteiros — AURUM
+# Portal de Parceiros AURUM
 
-App online para os subempreiteiros da AURUM carregarem os seus próprios documentos de
-compliance: os da empresa deles (alvará, seguros, certidões) e os de cada trabalhador que
-trazem para as obras (Cartão de Cidadão, Ficha de Aptidão Médica, EPI, Admissão na
-Segurança Social).
+App online para os parceiros (subempreiteiros) da AURUM carregarem os seus próprios
+documentos de compliance: os da empresa deles (alvará, seguros, certidões) e os de cada
+trabalhador que trazem para as obras (Cartão de Cidadão, Ficha de Aptidão Médica, EPI,
+Admissão na Segurança Social).
 
 Diferente da Gestão Documental interna (rede local, sem login), esta app fica acessível
-pela internet — por isso tem login próprio por subempreiteiro, mais um login separado de
+pela internet — por isso tem login próprio por parceiro, mais um login separado de
 administração para a AURUM gerir contas e rever o que foi carregado.
 
 ## Arrancar localmente
@@ -20,12 +20,12 @@ Fica disponível em `http://localhost:3200`. Em desenvolvimento local, sem `ADMI
 definida, a app usa `admin123` como password de administração (só localmente — nunca em
 produção).
 
-Ao arrancar pela primeira vez, semeia automaticamente os 3 subempreiteiros já conhecidos da
+Ao arrancar pela primeira vez, semeia automaticamente os 3 parceiros já conhecidos da
 Financeira (Fassada Profi, Invernoaxadrezado, Diego SA Fachadas) **sem credenciais** — entra
 como administração e usa "Definir credenciais" para cada um antes de lhes dares o acesso.
 Esta lista **não está ligada ao vivo** à app Financeira (que corre só localmente, sem login,
-e nunca deve ficar exposta à internet) — se aparecer um subempreiteiro novo lá, acrescenta-o
-aqui à mão pelo painel de administração.
+e nunca deve ficar exposta à internet) — se aparecer um parceiro novo lá, acrescenta-o aqui
+à mão pelo painel de administração.
 
 ## Deploy no Render.com (recomendado)
 
@@ -45,27 +45,30 @@ aqui à mão pelo painel de administração.
    - `ADMIN_PASSWORD` — password forte para a administração (obrigatória; a app recusa-se a
      arrancar em produção sem ela).
    - `NODE_ENV` = `production`
-7. Depois do deploy, o Render dá-te um URL tipo `https://subempreiteiros-aurum.onrender.com`,
-   já com HTTPS automático — é esse o link a entregar a cada subempreiteiro, junto do
-   utilizador e password que definires para eles.
+7. Depois do deploy, o Render dá-te um URL tipo `https://subempreiteirosaurum.onrender.com`,
+   já com HTTPS automático — é esse o link a entregar a cada parceiro, junto do utilizador e
+   password que definires para eles.
 
-## Gerir subempreiteiros
+## Gerir parceiros
 
 - Entra como administração no ecrã de login ("Entrar como AURUM").
 - **Definir credenciais / Repor password:** escolhe um utilizador e uma password simples
-  para o subempreiteiro; no primeiro acesso, ele é obrigado a trocar essa password por uma
-  própria antes de poder usar a app.
-- **Descarregar (.zip):** obtém tudo o que esse subempreiteiro já carregou (empresa +
-  trabalhadores) numa só pasta comprimida.
+  para o parceiro; no primeiro acesso, ele é obrigado a trocar essa password por uma própria
+  antes de poder usar a app.
+- **Entrar como:** vê e gere a conta de um parceiro sem precisares de saber a password dele
+  — útil para ajudar ou confirmar o que já foi carregado. Abre sempre num separador novo.
+- **Descarregar (.zip):** obtém tudo o que esse parceiro já carregou (empresa + trabalhadores)
+  numa só pasta comprimida.
 - **Ativar/Desativar:** desativar impede o login sem apagar nada — usa isto em vez de
-  remover, a não ser que queiras mesmo apagar os dados desse subempreiteiro.
-- A coluna "Em falta" mostra, para cada subempreiteiro, que documentos da empresa ou de que
+  remover, a não ser que queiras mesmo apagar os dados desse parceiro.
+- A coluna "Em falta" mostra, para cada parceiro, que documentos da empresa ou de que
   trabalhadores ainda faltam carregar.
 
 ## Notas de segurança
 
 - Sessões guardadas em memória — reiniciar o servidor termina todas as sessões (login outra
-  vez é rápido e sem impacto nos dados, que ficam persistidos em `data/`).
+  vez é rápido e sem impacto nos dados, que ficam persistidos em `data/`, num disco
+  persistente do Render).
 - Passwords guardadas com hash (`scrypt` + salt), nunca em texto simples.
 - Proteção contra tentativas de login em série (bloqueio temporário por IP ao fim de várias
   falhas).

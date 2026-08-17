@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal de Subempreiteiros — AURUM</title>
+<title>Portal de Parceiros AURUM</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
   <div class="login-caixa">
     <img src="logo.png" alt="AURUM" class="logo">
     <div id="login-normal">
-      <h1>Portal de Subempreiteiros</h1>
+      <h1>Portal de Parceiros AURUM</h1>
       <p class="subtitulo">Carrega aqui os documentos da tua empresa e dos teus trabalhadores.</p>
       <form id="form-login">
         <label>Utilizador
@@ -28,7 +28,7 @@
     </div>
     <div id="login-admin-bloco" hidden>
       <h1>Administração AURUM</h1>
-      <p class="subtitulo">Portal de Subempreiteiros</p>
+      <p class="subtitulo">Portal de Parceiros AURUM</p>
       <form id="form-login-admin">
         <label>Password de administração
           <input type="password" id="login-admin-password" autocomplete="current-password">
@@ -46,14 +46,14 @@
       <img src="logo.png" alt="AURUM" class="logo">
       <div>
         <h1 id="sub-nome-header">—</h1>
-        <p class="subtitulo">Portal de Subempreiteiros AURUM</p>
+        <p class="subtitulo">Portal de Parceiros AURUM</p>
       </div>
     </div>
     <div class="header-acoes">
       <button class="btn btn-secondary btn-sm" id="btn-sub-logout">Sair</button>
     </div>
   </header>
-  <div id="banner-como-admin" class="banner-alerta" hidden>🔑 Estás a ver esta conta como administração AURUM — as alterações feitas aqui afetam a conta real deste subempreiteiro.</div>
+  <div id="banner-como-admin" class="banner-alerta" hidden>🔑 Estás a ver esta conta como administração AURUM — as alterações feitas aqui afetam a conta real deste parceiro.</div>
   <div id="banner-validade-sub" class="banner-alerta banner-alerta-vermelho" hidden></div>
   <main>
     <section class="secao">
@@ -92,7 +92,7 @@
     <div class="marca">
       <img src="logo.png" alt="AURUM" class="logo">
       <div>
-        <h1>Administração — Subempreiteiros</h1>
+        <h1>Administração — Parceiros AURUM</h1>
         <p class="subtitulo">Painel interno AURUM</p>
       </div>
     </div>
@@ -103,8 +103,8 @@
   <main>
     <section class="secao">
       <div class="secao-header">
-        <h2>Subempreiteiros</h2>
-        <button id="btn-novo-subempreiteiro" class="btn btn-primary btn-sm">+ Novo subempreiteiro</button>
+        <h2>Parceiros AURUM</h2>
+        <button id="btn-novo-subempreiteiro" class="btn btn-primary btn-sm">+ Novo parceiro</button>
       </div>
       <div style="overflow-x:auto">
         <table class="admin-tabela" id="tabela-subempreiteiros">
@@ -139,7 +139,7 @@
 
 <div id="modal-novo-subempreiteiro" class="modal-overlay" hidden>
   <div class="modal-box">
-    <p>Novo subempreiteiro</p>
+    <p>Novo parceiro</p>
     <label>Nome
       <input type="text" id="input-novo-subempreiteiro-nome" autocomplete="off">
     </label>

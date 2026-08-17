@@ -636,7 +636,7 @@ app.post('/api/admin/subempreiteiros', exigirAdmin, (req, res) => {
 app.post('/api/admin/subempreiteiros/:id/credenciais', exigirAdmin, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.params.id];
-  if (!sub) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
+  if (!sub) return res.status(404).json({ erro: 'Parceiro não encontrado.' });
   const username = (req.body && req.body.username ? String(req.body.username) : '').trim();
   const password = req.body && req.body.password ? String(req.body.password) : '';
   if (!username) return res.status(400).json({ erro: 'O utilizador é obrigatório.' });
@@ -644,7 +644,7 @@ app.post('/api/admin/subempreiteiros/:id/credenciais', exigirAdmin, (req, res) =
   const emUsoPorOutro = Object.entries(db.subempreiteiros).some(
     ([id, s]) => id !== req.params.id && s.username && s.username.toLowerCase() === username.toLowerCase(),
   );
-  if (emUsoPorOutro) return res.status(400).json({ erro: 'Já existe outro subempreiteiro com esse utilizador.' });
+  if (emUsoPorOutro) return res.status(400).json({ erro: 'Já existe outro parceiro com esse utilizador.' });
   const { salt, hash } = hashPassword(password);
   sub.username = username;
   sub.salt = salt;
@@ -657,7 +657,7 @@ app.post('/api/admin/subempreiteiros/:id/credenciais', exigirAdmin, (req, res) =
 app.patch('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.params.id];
-  if (!sub) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
+  if (!sub) return res.status(404).json({ erro: 'Parceiro não encontrado.' });
   if (req.body && req.body.nome !== undefined) {
     const nome = String(req.body.nome).trim();
     if (!nome) return res.status(400).json({ erro: 'O nome não pode ficar vazio.' });
@@ -675,8 +675,8 @@ app.patch('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
 app.post('/api/admin/subempreiteiros/:id/entrar-como', exigirAdmin, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.params.id];
-  if (!sub) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
-  if (!sub.ativo) return res.status(400).json({ erro: 'Este subempreiteiro está desativado.' });
+  if (!sub) return res.status(404).json({ erro: 'Parceiro não encontrado.' });
+  if (!sub.ativo) return res.status(400).json({ erro: 'Este parceiro está desativado.' });
   const token = criarSessao({ tipo: 'subempreiteiro', subempreiteiroId: sub.id, comoAdmin: true });
   definirCookie(res, COOKIE_SUB, token, { maxAgeMs: SESSAO_DURACAO_MS });
   res.redirect(302, '/');
@@ -684,7 +684,7 @@ app.post('/api/admin/subempreiteiros/:id/entrar-como', exigirAdmin, (req, res) =
 
 app.delete('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
   const db = readDb();
-  if (!db.subempreiteiros[req.params.id]) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
+  if (!db.subempreiteiros[req.params.id]) return res.status(404).json({ erro: 'Parceiro não encontrado.' });
   delete db.subempreiteiros[req.params.id];
   writeDb(db);
   fs.rm(path.join(SUBS_DIR, req.params.id), { recursive: true, force: true }, () => {});
@@ -694,8 +694,8 @@ app.delete('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
 app.get('/api/admin/subempreiteiros/:id/export', exigirAdmin, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.params.id];
-  if (!sub) return res.status(404).json({ erro: 'Subempreiteiro não encontrado.' });
-  const pasta = String(sub.nome).replace(/[\\/:*?"<>|]/g, '').trim() || 'subempreiteiro';
+  if (!sub) return res.status(404).json({ erro: 'Parceiro não encontrado.' });
+  const pasta = String(sub.nome).replace(/[\\/:*?"<>|]/g, '').trim() || 'parceiro';
   res.attachment(`${pasta}.zip`);
   const archive = new ZipArchive({ zlib: { level: 9 } });
   archive.on('error', (err) => res.status(500).end(String(err)));
@@ -744,5 +744,5 @@ app.get('*', (req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  Portal de Subempreiteiros a correr em http://localhost:${PORT}\n`);
+  console.log(`\n  Portal de Parceiros AURUM a correr em http://localhost:${PORT}\n`);
 });

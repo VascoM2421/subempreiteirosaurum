@@ -487,7 +487,7 @@ function renderTabelaAdmin() {
     const btnEntrar = document.createElement('button');
     btnEntrar.className = 'btn btn-secondary btn-sm';
     btnEntrar.textContent = 'Entrar como';
-    btnEntrar.title = 'Ver e gerir esta conta como se fosses o subempreiteiro';
+    btnEntrar.title = 'Ver e gerir esta conta como se fosses o parceiro';
     btnEntrar.disabled = !s.ativo;
     btnEntrar.addEventListener('click', () => entrarComoSubempreiteiro(s.id));
     acoes.appendChild(btnEntrar);
@@ -533,7 +533,7 @@ $('#btn-guardar-credenciais').addEventListener('click', async () => {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
     });
     $('#modal-credenciais').hidden = true;
-    toast(`Credenciais definidas — utilizador "${resultado.username}", password "${resultado.password}". Anota e entrega ao subempreiteiro.`);
+    toast(`Credenciais definidas — utilizador "${resultado.username}", password "${resultado.password}". Anota e entrega ao parceiro.`);
     await carregarAdmin();
   } catch (err) { toast(err.message, true); }
 });
@@ -553,11 +553,11 @@ $('#btn-novo-subempreiteiro').addEventListener('click', () => {
 $('#btn-fechar-novo-subempreiteiro').addEventListener('click', () => { $('#modal-novo-subempreiteiro').hidden = true; });
 $('#btn-guardar-novo-subempreiteiro').addEventListener('click', async () => {
   const nome = $('#input-novo-subempreiteiro-nome').value.trim();
-  if (!nome) { toast('Indica o nome do subempreiteiro.', true); return; }
+  if (!nome) { toast('Indica o nome do parceiro.', true); return; }
   try {
     await api('/api/admin/subempreiteiros', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
     $('#modal-novo-subempreiteiro').hidden = true;
-    toast('Subempreiteiro criado. Define agora as credenciais.');
+    toast('Parceiro criado. Define agora as credenciais.');
     await carregarAdmin();
   } catch (err) { toast(err.message, true); }
 });

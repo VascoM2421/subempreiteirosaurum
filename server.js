@@ -37,6 +37,7 @@ const {
   EMPRESA_DOCS_COM_VALIDADE,
   TRABALHADOR_DOCS_COM_VALIDADE,
   DIAS_AVISO_VALIDADE,
+  PRAZOS_VALIDADE_POR_EMISSAO,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
@@ -354,6 +355,8 @@ function normDataDoc(s) {
 
 // Procura uma data de validade no texto extraído do documento, junto a palavras-chave como
 // "válido até"/"validade". Devolve "YYYY-MM-DD" ou null se não encontrar nada plausível.
+// NOTA: só serve para documentos cuja validade vem impressa como data absoluta (ex: recibos
+// de seguro). Para os 4 tipos em PRAZOS_VALIDADE_POR_EMISSAO isto NÃO se aplica — ver abaixo.
 function extrairDataValidade(texto) {
   const padroesData = '\\d{2}[-/.\\s]\\d{2}[-/.\\s]\\d{4}|\\d{4}-\\d{2}-\\d{2}';
   const re = new RegExp(`(?:v[aá]lid[oa]\\s*at[ée]|data\\s*de\\s*validade|prazo\\s*de\\s*validade|validade)[:\\s]*(${padroesData})`, 'i');
@@ -363,11 +366,57 @@ function extrairDataValidade(texto) {
   return validarDataValidade(data) || null;
 }
 
+const MESES_PT_NUM = { janeiro: 1, fevereiro: 2, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12 };
+function semAcento(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+// Procura a data de EMISSÃO do documento (não a validade) — usada para os tipos cuja
+// validade legal é um prazo fixo a contar da emissão (ver PRAZOS_VALIDADE_POR_EMISSAO).
+// Tenta primeiro o formato numérico junto de "data de emissão"/"emitid[oa]", depois cai para
+// o formato português por extenso ("14 de Agosto de 2026", usado pelas certidões das
+// Finanças). Devolve "YYYY-MM-DD" ou null.
+function extrairDataEmissao(texto) {
+  const padroesData = '\\d{2}[-/.\\s]\\d{2}[-/.\\s]\\d{4}|\\d{4}-\\d{2}-\\d{2}';
+  const reNumerica = new RegExp(`(?:data\\s*de\\s*emiss[ãa]o|emitid[oa]\\s*(?:em|a))[:\\s]*(${padroesData})`, 'i');
+  const mNum = texto.match(reNumerica);
+  const dataNumerica = normDataDoc(mNum && mNum[1]);
+  if (dataNumerica) return validarDataValidade(dataNumerica) || null;
+
+  const rePorExtenso = /(\d{1,2})\s+de\s+([a-zà-ú]+)\s+de\s+(\d{4})/i;
+  const mExtenso = texto.match(rePorExtenso);
+  if (mExtenso) {
+    const mes = MESES_PT_NUM[semAcento(mExtenso[2])];
+    if (mes) {
+      const data = `${mExtenso[3]}-${String(mes).padStart(2, '0')}-${String(mExtenso[1]).padStart(2, '0')}`;
+      return validarDataValidade(data) || null;
+    }
+  }
+  return null;
+}
+
+// Soma meses/dias a uma data "YYYY-MM-DD" usando componentes locais (evita o deslocamento de
+// fuso horário que dá datas erradas quando se usa new Date(isoString) diretamente).
+function somarDuracao(dataIso, { meses = 0, dias = 0 } = {}) {
+  const [ano, mes, dia] = dataIso.split('-').map(Number);
+  const d = new Date(ano, mes - 1, dia);
+  if (meses) d.setMonth(d.getMonth() + meses);
+  if (dias) d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Lê o ficheiro uma só vez e aplica tanto a classificação (tipo certo?) como a extração da
 // data de validade — evita repetir OCR/leitura de PDF duas vezes para o mesmo ficheiro. Nunca
 // deixa o upload falhar por causa disto — se a leitura falhar, devolve {} e segue-se como
 // antes desta funcionalidade existir.
-async function analisarDocumentoEmpresa(filePath, ext, docKey) {
+//
+// Para certidão de não dívida (SS/Finanças) e registo criminal, a validade real é um prazo
+// fixo a contar da EMISSÃO, não uma data impressa como "válido até" — essa procura por
+// palavra-chave chegou a apanhar a validade do código de acesso online (2 anos) em vez da
+// validade legal da declaração (4 meses). `dataEmissaoFallback` (normalmente a data de
+// upload) cobre os casos em que a data de emissão não é lida do texto (ex: registo criminal,
+// cujo PDF não tem texto selecionável com essa data — só uma marca de água repetida).
+async function analisarDocumentoEmpresa(filePath, ext, docKey, dataEmissaoFallback) {
   const resultado = {};
   let texto;
   try {
@@ -378,8 +427,14 @@ async function analisarDocumentoEmpresa(filePath, ext, docKey) {
   const classificacao = classificarDocumento(texto, docKey);
   if (!classificacao.ok) resultado.avisoTipo = classificacao.tipoSugerido;
   if (EMPRESA_DOCS_COM_VALIDADE.includes(docKey)) {
-    const data = extrairDataValidade(texto);
-    if (data) resultado.dataValidade = data;
+    const prazo = PRAZOS_VALIDADE_POR_EMISSAO[docKey];
+    if (prazo) {
+      const emissao = extrairDataEmissao(texto) || dataEmissaoFallback || null;
+      if (emissao) resultado.dataValidade = somarDuracao(emissao, prazo);
+    } else {
+      const data = extrairDataValidade(texto);
+      if (data) resultado.dataValidade = data;
+    }
   }
   return resultado;
 }
@@ -401,7 +456,7 @@ async function reanalisarDocsExistentes() {
         const filePath = ficheiroPath(empresaDir(sub.id), docKey, entrada.id, entrada.ext);
         if (!fs.existsSync(filePath)) continue;
         ficheiros++;
-        const resultado = await analisarDocumentoEmpresa(filePath, entrada.ext, docKey);
+        const resultado = await analisarDocumentoEmpresa(filePath, entrada.ext, docKey, (entrada.uploadedAt || '').slice(0, 10) || null);
         if (resultado.avisoTipo) { entrada.avisoTipo = resultado.avisoTipo; avisos++; }
         if (resultado.dataValidade && !entrada.dataValidade) { entrada.dataValidade = resultado.dataValidade; validades++; }
       }
@@ -410,6 +465,40 @@ async function reanalisarDocsExistentes() {
   db.migracoes.reanaliseDocsV1 = true;
   writeDb(db);
   console.log(`[arranque] Reanálise de documentos existentes: ${ficheiros} ficheiro(s) visto(s), ${avisos} aviso(s) de tipo, ${validades} data(s) de validade preenchida(s).`);
+}
+
+// Migração corretiva de arranque, corre uma única vez (marcada em db.migracoes): a
+// reanaliseDocsV1 acima nunca substitui uma dataValidade já preenchida, mas para os 4 tipos
+// em PRAZOS_VALIDADE_POR_EMISSAO essa data já preenchida estava ERRADA (vinha de procurar um
+// "válido até" no texto, que nestes documentos não corresponde à validade legal real — ver
+// nota em analisarDocumentoEmpresa). Esta migração RECALCULA e SUBSTITUI a dataValidade
+// desses 4 tipos especificamente, mesmo já estando preenchida.
+async function corrigirValidadePorEmissaoExistentes() {
+  const db = readDb();
+  db.migracoes = db.migracoes || {};
+  if (db.migracoes.corrigirValidadePorEmissaoV1) return;
+  let ficheiros = 0, corrigidos = 0;
+  for (const sub of Object.values(db.subempreiteiros)) {
+    for (const docKey of Object.keys(PRAZOS_VALIDADE_POR_EMISSAO)) {
+      const lista = (sub.docs || {})[docKey];
+      if (!Array.isArray(lista)) continue;
+      for (const entrada of lista) {
+        const filePath = ficheiroPath(empresaDir(sub.id), docKey, entrada.id, entrada.ext);
+        if (!fs.existsSync(filePath)) continue;
+        ficheiros++;
+        const antiga = entrada.dataValidade;
+        const resultado = await analisarDocumentoEmpresa(filePath, entrada.ext, docKey, (entrada.uploadedAt || '').slice(0, 10) || null);
+        if (resultado.dataValidade && resultado.dataValidade !== antiga) {
+          entrada.dataValidade = resultado.dataValidade;
+          corrigidos++;
+          console.log(`[arranque] Validade corrigida: ${sub.nome || sub.id} / ${docKey} — era ${antiga || '(vazia)'}, passou a ${resultado.dataValidade}.`);
+        }
+      }
+    }
+  }
+  db.migracoes.corrigirValidadePorEmissaoV1 = true;
+  writeDb(db);
+  console.log(`[arranque] Correção de validade por emissão: ${ficheiros} ficheiro(s) visto(s), ${corrigidos} data(s) corrigida(s).`);
 }
 
 // ---------- App ----------
@@ -531,7 +620,7 @@ app.post('/api/docs/:docKey', exigirSubempreiteiro, assignFileId, (req, res) => 
     const sub = db.subempreiteiros[req.subempreiteiroId];
     if (!Array.isArray(sub.docs[docKey])) sub.docs[docKey] = [];
     const entrada = { id: req.fileId, originalName: req.file.originalname, ext: path.extname(req.file.originalname).toLowerCase(), uploadedAt: new Date().toISOString() };
-    Object.assign(entrada, await analisarDocumentoEmpresa(req.file.path, entrada.ext, docKey));
+    Object.assign(entrada, await analisarDocumentoEmpresa(req.file.path, entrada.ext, docKey, entrada.uploadedAt.slice(0, 10)));
     sub.docs[docKey].push(entrada);
     if (sub.rejeicoesDocs) delete sub.rejeicoesDocs[docKey];
     writeDb(db);
@@ -556,7 +645,7 @@ app.post('/api/docs/:docKey/:fileId', exigirSubempreiteiro, (req, res) => {
     const novaExt = path.extname(req.file.originalname).toLowerCase();
     if (entradaAntiga.ext !== novaExt) fs.rm(ficheiroPath(empresaDir(req.subempreiteiroId), docKey, fileId, entradaAntiga.ext), { force: true }, () => {});
     const novaEntrada = { id: fileId, originalName: req.file.originalname, ext: novaExt, uploadedAt: new Date().toISOString() };
-    Object.assign(novaEntrada, await analisarDocumentoEmpresa(req.file.path, novaExt, docKey));
+    Object.assign(novaEntrada, await analisarDocumentoEmpresa(req.file.path, novaExt, docKey, novaEntrada.uploadedAt.slice(0, 10)));
     lista2[idx] = novaEntrada;
     if (sub2.rejeicoesDocs) delete sub2.rejeicoesDocs[docKey];
     writeDb(db2);
@@ -909,5 +998,8 @@ app.get('*', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  Portal de Parceiros AURUM a correr em http://localhost:${PORT}\n`);
-  reanalisarDocsExistentes().catch((e) => console.warn('[arranque] Reanálise de documentos falhou:', e.message));
+  reanalisarDocsExistentes()
+    .catch((e) => console.warn('[arranque] Reanálise de documentos falhou:', e.message))
+    .then(() => corrigirValidadePorEmissaoExistentes())
+    .catch((e) => console.warn('[arranque] Correção de validade por emissão falhou:', e.message));
 });

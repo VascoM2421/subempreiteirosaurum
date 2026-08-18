@@ -45,6 +45,20 @@ const EMPRESA_DOCS_COM_VALIDADE = ['recibo_at', 'recibo_rc', 'registo_criminal_e
 const TRABALHADOR_DOCS_COM_VALIDADE = ['cartao_cidadao', 'aptidao_medica'];
 const DIAS_AVISO_VALIDADE = 30;
 
+// Estes 4 tipos não têm uma data "válido até" impressa no documento — o que têm é uma data
+// de EMISSÃO e um prazo legal fixo a contar dela (confirmado no texto real das próprias
+// certidões da AURUM: a da Segurança Social diz "válida pelo prazo de 4 meses, a contar da
+// data de emissão"; a das Finanças diz "válida por quatro meses"; o registo criminal usa o
+// prazo de 90 dias já usado nos registos da AURUM). Procurar por um "válido até" nestes
+// documentos apanha datas erradas (ex: a validade do CÓDIGO de acesso online, que nada tem a
+// ver com a validade legal da declaração) — por isso calculam-se em vez de se procurar.
+const PRAZOS_VALIDADE_POR_EMISSAO = {
+  certidao_seg_social: { meses: 4 },
+  certidao_financas: { meses: 4 },
+  registo_criminal_empresa: { dias: 90 },
+  registo_criminal_gerente: { dias: 90 },
+};
+
 const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
 const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
@@ -116,6 +130,7 @@ module.exports = {
   EMPRESA_DOCS_COM_VALIDADE,
   TRABALHADOR_DOCS_COM_VALIDADE,
   DIAS_AVISO_VALIDADE,
+  PRAZOS_VALIDADE_POR_EMISSAO,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,

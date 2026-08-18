@@ -5,6 +5,23 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Leitura automática de documentos (OCR de imagens + texto de PDFs) — usada para preencher a
+// data de validade sozinha e para avisar quando um ficheiro parece ter sido carregado no
+// sítio errado. Carregado de forma preguiçosa e tolerante — se as libs não estiverem
+// instaladas, só estas funcionalidades extra ficam indisponíveis.
+let _tesseract = null, _Jimp = null;
+try { _tesseract = require('tesseract.js'); _Jimp = require('jimp').Jimp; } catch (e) { /* OCR indisponível */ }
+let _pdfjs = null;
+async function getPdfjs() {
+  if (!_pdfjs) {
+    const _log = console.log, _warn = console.warn;
+    console.log = console.warn = () => {};
+    try { _pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs'); }
+    finally { console.log = _log; console.warn = _warn; }
+  }
+  return _pdfjs;
+}
+
 const {
   EMPRESA_DOCS,
   TRABALHADOR_DOCS,
@@ -18,6 +35,7 @@ const {
   isTrabalhadorDocKey,
   docTrabalhadorObrigatorio,
   labelDocEmpresa,
+  classificarDocumento,
 } = require('./subDocTypes');
 
 const EM_PRODUCAO = process.env.NODE_ENV === 'production';
@@ -277,6 +295,53 @@ function docPreenchido(docs, docKey) {
   return Boolean(docs && docs[docKey] && docs[docKey].length > 0);
 }
 
+// ---------- Leitura automática de documentos (para detetar o tipo errado) ----------
+
+async function textoPorPagina(buffer) {
+  const pdfjs = await getPdfjs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
+  const paginas = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const tc = await page.getTextContent();
+    paginas.push(tc.items.map((it) => it.str).join(' '));
+  }
+  await doc.cleanup();
+  return paginas;
+}
+
+// OCR de imagens — amplia 2x + cinzento p/ ler bem o texto. cachePath dá ao tesseract um
+// sítio persistente para guardar o modelo de português, se precisar de o transferir.
+const OCR_CACHE = path.join(DATA_DIR, 'ocr-cache');
+async function ocrImagem(buffer) {
+  if (!_tesseract || !_Jimp) throw new Error('OCR não disponível (falta tesseract.js/jimp).');
+  const img = await _Jimp.read(buffer);
+  if (img.bitmap.width < 1700) img.scale(2);
+  img.greyscale();
+  const buf = await img.getBuffer('image/png');
+  const worker = await _tesseract.createWorker('por', 1, { cachePath: OCR_CACHE });
+  try { const { data: { text } } = await worker.recognize(buf); return String(text).replace(/\s+/g, ' '); }
+  finally { await worker.terminate(); }
+}
+
+async function textoDoFicheiro(filePath, ext) {
+  const buffer = fs.readFileSync(filePath);
+  const ehImagem = ['.png', '.jpg', '.jpeg'].includes(ext.toLowerCase());
+  if (ehImagem) return await ocrImagem(buffer);
+  return (await textoPorPagina(buffer)).join(' ').replace(/\s+/g, ' ');
+}
+
+// Nunca deixa o upload falhar por causa disto — se a leitura falhar ou não houver sinal
+// claro, simplesmente não avisa (ver classificarDocumento em subDocTypes.js).
+async function tentarClassificarDocumento(filePath, ext, docKey) {
+  try {
+    const texto = await textoDoFicheiro(filePath, ext);
+    return classificarDocumento(texto, docKey);
+  } catch (e) {
+    return { ok: true };
+  }
+}
+
 // ---------- App ----------
 const app = express();
 app.set('trust proxy', 1);
@@ -321,7 +386,7 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/eu', exigirSubempreiteiro, (req, res) => {
   const db = readDb();
   const sub = db.subempreiteiros[req.subempreiteiroId];
-  res.json({ nome: sub.nome, passwordAlterada: Boolean(sub.passwordAlterada), docs: sub.docs || {}, comoAdmin: req.comoAdmin });
+  res.json({ nome: sub.nome, passwordAlterada: Boolean(sub.passwordAlterada), docs: sub.docs || {}, comoAdmin: req.comoAdmin, rejeicoesDocs: sub.rejeicoesDocs || {} });
 });
 
 app.post('/api/alterar-password', exigirSubempreiteiro, (req, res) => {
@@ -389,14 +454,17 @@ const uploadEmpresaSubstituir = makeUpload(
 app.post('/api/docs/:docKey', exigirSubempreiteiro, assignFileId, (req, res) => {
   const { docKey } = req.params;
   if (!isEmpresaDocKey(docKey)) return res.status(400).json({ erro: 'Tipo de documento inválido.' });
-  uploadEmpresaNovo.single('file')(req, res, (err) => {
+  uploadEmpresaNovo.single('file')(req, res, async (err) => {
     if (err) return handleMulterError(err, res);
     if (!req.file) return res.status(400).json({ erro: 'Nenhum ficheiro enviado.' });
     const db = readDb();
     const sub = db.subempreiteiros[req.subempreiteiroId];
     if (!Array.isArray(sub.docs[docKey])) sub.docs[docKey] = [];
     const entrada = { id: req.fileId, originalName: req.file.originalname, ext: path.extname(req.file.originalname).toLowerCase(), uploadedAt: new Date().toISOString() };
+    const classificacao = await tentarClassificarDocumento(req.file.path, entrada.ext, docKey);
+    if (!classificacao.ok) entrada.avisoTipo = classificacao.tipoSugerido;
     sub.docs[docKey].push(entrada);
+    if (sub.rejeicoesDocs) delete sub.rejeicoesDocs[docKey];
     writeDb(db);
     res.status(201).json({ ok: true, doc: entrada });
   });
@@ -409,15 +477,20 @@ app.post('/api/docs/:docKey/:fileId', exigirSubempreiteiro, (req, res) => {
   const lista = sub.docs[docKey] || [];
   const entradaAntiga = lista.find((f) => f.id === fileId);
   if (!entradaAntiga) return res.status(404).json({ erro: 'Documento não encontrado.' });
-  uploadEmpresaSubstituir.single('file')(req, res, (err) => {
+  uploadEmpresaSubstituir.single('file')(req, res, async (err) => {
     if (err) return handleMulterError(err, res);
     if (!req.file) return res.status(400).json({ erro: 'Nenhum ficheiro enviado.' });
     const db2 = readDb();
-    const lista2 = db2.subempreiteiros[req.subempreiteiroId].docs[docKey];
+    const sub2 = db2.subempreiteiros[req.subempreiteiroId];
+    const lista2 = sub2.docs[docKey];
     const idx = lista2.findIndex((f) => f.id === fileId);
     const novaExt = path.extname(req.file.originalname).toLowerCase();
     if (entradaAntiga.ext !== novaExt) fs.rm(ficheiroPath(empresaDir(req.subempreiteiroId), docKey, fileId, entradaAntiga.ext), { force: true }, () => {});
-    lista2[idx] = { id: fileId, originalName: req.file.originalname, ext: novaExt, uploadedAt: new Date().toISOString() };
+    const novaEntrada = { id: fileId, originalName: req.file.originalname, ext: novaExt, uploadedAt: new Date().toISOString() };
+    const classificacao = await tentarClassificarDocumento(req.file.path, novaExt, docKey);
+    if (!classificacao.ok) novaEntrada.avisoTipo = classificacao.tipoSugerido;
+    lista2[idx] = novaEntrada;
+    if (sub2.rejeicoesDocs) delete sub2.rejeicoesDocs[docKey];
     writeDb(db2);
     res.json({ ok: true, doc: lista2[idx] });
   });
@@ -455,6 +528,28 @@ app.delete('/api/docs/:docKey/:fileId', exigirSubempreiteiro, (req, res) => {
   const entrada = lista[idx];
   fs.rm(ficheiroPath(empresaDir(req.subempreiteiroId), docKey, fileId, entrada.ext), { force: true }, () => {});
   lista.splice(idx, 1);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+// Rejeita um documento já carregado: apaga o ficheiro e grava o motivo, que fica visível ao
+// parceiro no cartão desse documento até ele carregar um novo. Só a administração, a ver a
+// conta do parceiro através de "Entrar como" (req.comoAdmin), pode fazer isto.
+app.post('/api/docs/:docKey/:fileId/rejeitar', exigirSubempreiteiro, (req, res) => {
+  if (!req.comoAdmin) return res.status(403).json({ erro: 'Ação só disponível para a administração.' });
+  const { docKey, fileId } = req.params;
+  const motivo = (req.body && req.body.motivo ? String(req.body.motivo) : '').trim();
+  if (!motivo) return res.status(400).json({ erro: 'Indica o motivo da rejeição.' });
+  const db = readDb();
+  const sub = db.subempreiteiros[req.subempreiteiroId];
+  const lista = sub.docs[docKey] || [];
+  const idx = lista.findIndex((f) => f.id === fileId);
+  if (idx === -1) return res.status(404).json({ erro: 'Documento não encontrado.' });
+  const entrada = lista[idx];
+  fs.rm(ficheiroPath(empresaDir(req.subempreiteiroId), docKey, fileId, entrada.ext), { force: true }, () => {});
+  lista.splice(idx, 1);
+  sub.rejeicoesDocs = sub.rejeicoesDocs || {};
+  sub.rejeicoesDocs[docKey] = { motivo, data: new Date().toISOString() };
   writeDb(db);
   res.json({ ok: true });
 });
@@ -681,6 +776,7 @@ app.post('/api/admin/subempreiteiros/:id/entrar-como', exigirAdmin, (req, res) =
   definirCookie(res, COOKIE_SUB, token, { maxAgeMs: SESSAO_DURACAO_MS });
   res.redirect(302, '/');
 });
+
 
 app.delete('/api/admin/subempreiteiros/:id', exigirAdmin, (req, res) => {
   const db = readDb();

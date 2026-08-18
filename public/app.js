@@ -3,6 +3,8 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 let config = null;
 let empresaDocsAtual = {};
+let rejeicoesDocsAtual = {};
+let comoAdmin = false;
 let trabalhadores = [];
 let selecionadoTrabalhadorId = null;
 let subempreiteirosAdmin = [];
@@ -36,6 +38,33 @@ function confirmarModal(mensagem) {
     const btnCancelar = $('#modal-btn-cancelar');
     const onConfirmar = () => { limpar(); resolve(true); };
     const onCancelar = () => { limpar(); resolve(false); };
+    btnConfirmar.addEventListener('click', onConfirmar);
+    btnCancelar.addEventListener('click', onCancelar);
+  });
+}
+
+function pedirMotivoRejeicao(mensagem) {
+  return new Promise((resolve) => {
+    const overlay = $('#modal-rejeitar');
+    const input = $('#input-motivo-rejeicao');
+    $('#modal-rejeitar-mensagem').textContent = mensagem;
+    input.value = '';
+    overlay.hidden = false;
+    input.focus();
+    const limpar = () => {
+      overlay.hidden = true;
+      btnConfirmar.removeEventListener('click', onConfirmar);
+      btnCancelar.removeEventListener('click', onCancelar);
+    };
+    const btnConfirmar = $('#btn-confirmar-rejeicao');
+    const btnCancelar = $('#btn-cancelar-rejeicao');
+    const onConfirmar = () => {
+      const motivo = input.value.trim();
+      if (!motivo) { toast('Indica o motivo da rejeição.', true); return; }
+      limpar();
+      resolve(motivo);
+    };
+    const onCancelar = () => { limpar(); resolve(null); };
     btnConfirmar.addEventListener('click', onConfirmar);
     btnCancelar.addEventListener('click', onCancelar);
   });
@@ -99,7 +128,12 @@ function validadeHtml(f) {
   `;
 }
 
-function criarDocCard(tipo, ficheiros, { baseUrl, onDone, comValidade, obrigatorio, accept }) {
+function labelDocPorChave(chave) {
+  const tipo = config && (config.empresaDocs.find((d) => d.key === chave) || config.trabalhadorDocs.find((d) => d.key === chave));
+  return tipo ? tipo.label : chave;
+}
+
+function criarDocCard(tipo, ficheiros, { baseUrl, onDone, comValidade, obrigatorio, accept, podeRejeitar, rejeicao }) {
   ficheiros = ficheiros || [];
   const card = document.createElement('div');
   card.className = 'doc-card';
@@ -114,6 +148,7 @@ function criarDocCard(tipo, ficheiros, { baseUrl, onDone, comValidade, obrigator
             <span class="doc-ficheiro-nome">✅ ${escapeHtml(f.originalName)}</span>
             <span class="doc-ficheiro-data">Carregado em ${formatarData(f.uploadedAt)}</span>
           </div>
+          ${f.avisoTipo ? `<p class="doc-aviso-tipo">⚠️ Isto pode não ser o documento certo — parece um(a) ${escapeHtml(labelDocPorChave(f.avisoTipo))}.</p>` : ''}
           ${comValidade ? validadeHtml(f) : ''}
           <div class="doc-ficheiro-actions">
             <button type="button" class="btn btn-secondary btn-sm btn-ver">Ver</button>
@@ -123,10 +158,11 @@ function criarDocCard(tipo, ficheiros, { baseUrl, onDone, comValidade, obrigator
               <input type="file" accept="${aceite}" class="input-substituir">
             </label>
             <button type="button" class="btn btn-danger btn-sm btn-remover">Remover</button>
+            ${podeRejeitar ? '<button type="button" class="btn btn-danger btn-sm btn-rejeitar">Rejeitar</button>' : ''}
           </div>
         </li>
       `).join('')}</ul>`
-    : `<p class="doc-status falta">Nenhum ficheiro carregado.</p>`;
+    : `<p class="doc-status falta">${rejeicao ? `❌ O último ficheiro foi rejeitado: <em>${escapeHtml(rejeicao.motivo)}</em> — carrega um novo.` : 'Nenhum ficheiro carregado.'}</p>`;
 
   card.innerHTML = `
     <div class="doc-card-header">
@@ -196,6 +232,19 @@ function criarDocCard(tipo, ficheiros, { baseUrl, onDone, comValidade, obrigator
         onDone();
       } catch (err) { toast(err.message, true); }
     });
+
+    const btnRejeitar = li.querySelector('.btn-rejeitar');
+    if (btnRejeitar) {
+      btnRejeitar.addEventListener('click', async () => {
+        const motivo = await pedirMotivoRejeicao(`Rejeitar "${f.originalName}" — porquê?`);
+        if (!motivo) return;
+        try {
+          await api(`${baseUrl}/${f.id}/rejeitar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motivo }) });
+          toast('Documento rejeitado.');
+          onDone();
+        } catch (err) { toast(err.message, true); }
+      });
+    }
   });
 
   return card;
@@ -259,15 +308,17 @@ async function iniciarComoSubempreiteiro() {
   const eu = await api('/api/eu');
   config = await api('/api/config');
   empresaDocsAtual = eu.docs || {};
+  rejeicoesDocsAtual = eu.rejeicoesDocs || {};
+  comoAdmin = Boolean(eu.comoAdmin);
   trabalhadores = await api('/api/trabalhadores');
 
   $('#ecra-login').hidden = true;
   $('#app-admin').hidden = true;
   $('#app-subempreiteiro').hidden = false;
   $('#sub-nome-header').textContent = eu.nome;
-  $('#banner-como-admin').hidden = !eu.comoAdmin;
+  $('#banner-como-admin').hidden = !comoAdmin;
 
-  $('#trocar-password-overlay').hidden = Boolean(eu.passwordAlterada) || Boolean(eu.comoAdmin);
+  $('#trocar-password-overlay').hidden = Boolean(eu.passwordAlterada) || comoAdmin;
 
   renderEmpresaDocs();
   renderListaTrabalhadores();
@@ -277,6 +328,7 @@ async function iniciarComoSubempreiteiro() {
 async function carregarEmpresaDocs() {
   const eu = await api('/api/eu');
   empresaDocsAtual = eu.docs || {};
+  rejeicoesDocsAtual = eu.rejeicoesDocs || {};
   renderEmpresaDocs();
   atualizarBannerSub();
 }
@@ -289,6 +341,8 @@ function renderEmpresaDocs() {
       baseUrl: `/api/docs/${tipo.key}`,
       onDone: carregarEmpresaDocs,
       comValidade: config.empresaDocsComValidade.includes(tipo.key),
+      podeRejeitar: comoAdmin,
+      rejeicao: rejeicoesDocsAtual[tipo.key],
     }));
   });
 }

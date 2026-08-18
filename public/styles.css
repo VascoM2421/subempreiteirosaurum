@@ -238,6 +238,16 @@ main { padding: 24px; max-width: 1100px; margin: 0 auto; }
 .doc-ficheiro-nome { color: var(--verde); font-weight: 600; word-break: break-word; }
 .doc-ficheiro-data { color: var(--texto-suave); }
 .doc-ficheiro-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.doc-aviso-tipo {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--amarelo);
+  background: var(--amarelo-fundo);
+  border: 1px solid var(--amarelo-borda);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.doc-status.falta em { color: var(--vermelho); font-style: normal; }
 .doc-add-btn { display: inline-block; }
 .doc-card input[type=file] { display: none; }
 
@@ -376,7 +386,7 @@ main { padding: 24px; max-width: 1100px; margin: 0 auto; }
 }
 .modal-box p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-y: auto; }
 .modal-box label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--texto-suave); margin-bottom: 10px; }
-.modal-box input { padding: 7px 9px; border: 1px solid var(--cinza-borda); border-radius: 6px; font-size: 14px; }
+.modal-box input, .modal-box textarea { padding: 7px 9px; border: 1px solid var(--cinza-borda); border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .toast {

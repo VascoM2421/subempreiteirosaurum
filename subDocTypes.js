@@ -49,6 +49,54 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
 const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
+// Palavras/frases típicas de cada tipo de documento — usadas para avisar quando um ficheiro
+// parece ter sido carregado no sítio errado (ex: um comprovativo de TSU em vez de um recibo
+// de seguro). Baseado em documentos reais da AURUM — ver nota no plano sobre a limitação de
+// não conseguir distinguir Acidentes de Trabalho de Responsabilidade Civil (ambos os recibos
+// são talões "2ª via" sem o tipo de seguro escrito por extenso; só a apólice o menciona).
+const PALAVRAS_CHAVE_EMPRESA_DOCS = {
+  alvara: ['alvará', 'classe máxima', 'instituto da construção', 'nipc'],
+  apolice_at: ['apólice', 'condições contratuais', 'acidentes de trabalho', 'tomador do seguro'],
+  recibo_at: ['recibo', 'prémio', 'companhia de seguros', 'apólice'],
+  apolice_rc: ['apólice', 'responsabilidade civil', 'condições contratuais', 'segurado'],
+  recibo_rc: ['recibo', 'prémio', 'companhia de seguros', 'apólice'],
+  registo_criminal_empresa: ['identificação criminal', 'registo criminal', 'certificado de registo'],
+  registo_criminal_gerente: ['identificação criminal', 'registo criminal', 'certificado de registo'],
+  certidao_seg_social: ['segurança social', 'situação contributiva', 'declaração'],
+  certidao_financas: ['autoridade tributária', 'situação tributária', 'serviço de finanças', 'certidão'],
+  certidao_permanente: ['certidão permanente', 'conservatória', 'registo comercial'],
+  declaracao_remuneracoes: ['declaração de remunerações', 'remunerações'],
+  comprovativo_tsu: ['tsu', 'taxa social única', 'comprovativo de pagamento'],
+};
+
+// Remove acentos e baixa para minúsculas — o OCR troca ou perde acentos com frequência
+// ("remunerações" -> "remuneracoes"), por isso a comparação nunca deve depender deles.
+function semAcentoMinusculo(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function contarAcertos(textoNormalizado, palavras) {
+  return palavras.reduce((n, p) => n + (textoNormalizado.includes(semAcentoMinusculo(p)) ? 1 : 0), 0);
+}
+
+// Verifica se o texto extraído de um documento bate certo com o tipo de campo onde foi
+// carregado. Devolve { ok: true } quando não há motivo para duvidar (incluindo quando o
+// texto não bate com o vocabulário conhecido de NENHUM tipo — preferível não avisar do que
+// avisar sem certeza nenhuma), ou { ok: false, tipoSugerido } quando outro tipo bate
+// claramente melhor e o tipo esperado não bateu em nada.
+function classificarDocumento(texto, docKeyEsperado) {
+  const textoNormalizado = semAcentoMinusculo(texto);
+  const pontuacoes = Object.entries(PALAVRAS_CHAVE_EMPRESA_DOCS).map(([key, palavras]) => ({
+    key,
+    pontos: contarAcertos(textoNormalizado, palavras),
+  }));
+  const pontuacaoEsperada = (pontuacoes.find((p) => p.key === docKeyEsperado) || {}).pontos || 0;
+  const melhor = pontuacoes.reduce((a, b) => (b.pontos > a.pontos ? b : a), { key: null, pontos: 0 });
+  if (pontuacaoEsperada > 0) return { ok: true };
+  if (melhor.pontos > 0 && melhor.key !== docKeyEsperado) return { ok: false, tipoSugerido: melhor.key };
+  return { ok: true };
+}
+
 function isEmpresaDocKey(key) {
   return EMPRESA_DOCS.some((d) => d.key === key);
 }
@@ -75,4 +123,5 @@ module.exports = {
   isTrabalhadorDocKey,
   docTrabalhadorObrigatorio,
   labelDocEmpresa,
+  classificarDocumento,
 };

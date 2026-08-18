@@ -53,7 +53,7 @@
       <button class="btn btn-secondary btn-sm" id="btn-sub-logout">Sair</button>
     </div>
   </header>
-  <div id="banner-como-admin" class="banner-alerta" hidden>🔑 Estás a ver esta conta como administração AURUM — as alterações feitas aqui afetam a conta real deste parceiro.</div>
+  <div id="banner-como-admin" class="banner-alerta" hidden>🔑 Estás a ver esta conta como administração AURUM — as alterações feitas aqui afetam a conta real deste parceiro. <a href="/admin">Voltar à administração</a></div>
   <div id="banner-validade-sub" class="banner-alerta banner-alerta-vermelho" hidden></div>
   <main>
     <section class="secao">
@@ -162,6 +162,19 @@
     <div class="modal-actions">
       <button id="btn-guardar-credenciais" class="btn btn-primary btn-sm">Guardar</button>
       <button id="btn-fechar-credenciais" class="btn btn-secondary btn-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-rejeitar" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <p id="modal-rejeitar-mensagem">Rejeitar ficheiro</p>
+    <label>Motivo
+      <textarea id="input-motivo-rejeicao" rows="3" placeholder="Explica ao parceiro porque é que este ficheiro não serve"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button id="btn-confirmar-rejeicao" class="btn btn-danger btn-sm">Rejeitar</button>
+      <button id="btn-cancelar-rejeicao" class="btn btn-secondary btn-sm">Cancelar</button>
     </div>
   </div>
 </div>

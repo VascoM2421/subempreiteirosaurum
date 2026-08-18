@@ -5,19 +5,28 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// Leitura automática de documentos (OCR de imagens + texto de PDFs) — usada para preencher a
-// data de validade sozinha e para avisar quando um ficheiro parece ter sido carregado no
-// sítio errado. Carregado de forma preguiçosa e tolerante — se as libs não estiverem
-// instaladas, só estas funcionalidades extra ficam indisponíveis.
+// Leitura automática de documentos (OCR de imagens + texto de PDFs) — usada para avisar
+// quando um ficheiro parece ter sido carregado no sítio errado. Carregado de forma
+// preguiçosa e tolerante — se as libs não estiverem instaladas, só isto fica indisponível.
 let _tesseract = null, _Jimp = null;
-try { _tesseract = require('tesseract.js'); _Jimp = require('jimp').Jimp; } catch (e) { /* OCR indisponível */ }
+try {
+  _tesseract = require('tesseract.js'); _Jimp = require('jimp').Jimp;
+  console.log('[arranque] OCR (tesseract.js + jimp): OK');
+} catch (e) {
+  console.warn('[arranque] OCR indisponível:', e.message);
+}
 let _pdfjs = null;
 async function getPdfjs() {
   if (!_pdfjs) {
     const _log = console.log, _warn = console.warn;
     console.log = console.warn = () => {};
-    try { _pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs'); }
-    finally { console.log = _log; console.warn = _warn; }
+    try {
+      _pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      console.log('[arranque] pdfjs-dist: OK');
+    } catch (e) {
+      console.warn('[arranque] pdfjs-dist indisponível:', e.message);
+      throw e;
+    } finally { console.log = _log; console.warn = _warn; }
   }
   return _pdfjs;
 }

@@ -340,15 +340,76 @@ async function textoDoFicheiro(filePath, ext) {
   return (await textoPorPagina(buffer)).join(' ').replace(/\s+/g, ' ');
 }
 
-// Nunca deixa o upload falhar por causa disto — se a leitura falhar ou não houver sinal
-// claro, simplesmente não avisa (ver classificarDocumento em subDocTypes.js).
-async function tentarClassificarDocumento(filePath, ext, docKey) {
+// Normaliza uma data encontrada no texto ("15-07-2026", "15.07.2026", "2026-07-15") para
+// "YYYY-MM-DD".
+function normDataDoc(s) {
+  if (!s) return null;
+  let m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // aceita também espaço como separador — o OCR troca por vezes um "-" por um espaço
+  m = s.match(/(\d{2})[-/.\s](\d{2})[-/.\s](\d{4})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+}
+
+// Procura uma data de validade no texto extraído do documento, junto a palavras-chave como
+// "válido até"/"validade". Devolve "YYYY-MM-DD" ou null se não encontrar nada plausível.
+function extrairDataValidade(texto) {
+  const padroesData = '\\d{2}[-/.\\s]\\d{2}[-/.\\s]\\d{4}|\\d{4}-\\d{2}-\\d{2}';
+  const re = new RegExp(`(?:v[aá]lid[oa]\\s*at[ée]|data\\s*de\\s*validade|prazo\\s*de\\s*validade|validade)[:\\s]*(${padroesData})`, 'i');
+  const m = texto.match(re);
+  const data = normDataDoc(m && m[1]);
+  if (!data) return null;
+  return validarDataValidade(data) || null;
+}
+
+// Lê o ficheiro uma só vez e aplica tanto a classificação (tipo certo?) como a extração da
+// data de validade — evita repetir OCR/leitura de PDF duas vezes para o mesmo ficheiro. Nunca
+// deixa o upload falhar por causa disto — se a leitura falhar, devolve {} e segue-se como
+// antes desta funcionalidade existir.
+async function analisarDocumentoEmpresa(filePath, ext, docKey) {
+  const resultado = {};
+  let texto;
   try {
-    const texto = await textoDoFicheiro(filePath, ext);
-    return classificarDocumento(texto, docKey);
+    texto = await textoDoFicheiro(filePath, ext);
   } catch (e) {
-    return { ok: true };
+    return resultado;
   }
+  const classificacao = classificarDocumento(texto, docKey);
+  if (!classificacao.ok) resultado.avisoTipo = classificacao.tipoSugerido;
+  if (EMPRESA_DOCS_COM_VALIDADE.includes(docKey)) {
+    const data = extrairDataValidade(texto);
+    if (data) resultado.dataValidade = data;
+  }
+  return resultado;
+}
+
+// Migração de arranque, corre uma única vez (marcada em db.migracoes): reanalisa todos os
+// documentos da empresa já carregados pelos parceiros — aviso de tipo errado e data de
+// validade — exatamente como se fossem carregados agora pela primeira vez. Nunca substitui
+// uma data de validade já preenchida (só entra se estiver vazia). Corre em segundo plano
+// depois do servidor já estar a aceitar pedidos, para não atrasar o arranque.
+async function reanalisarDocsExistentes() {
+  const db = readDb();
+  db.migracoes = db.migracoes || {};
+  if (db.migracoes.reanaliseDocsV1) return;
+  let ficheiros = 0, avisos = 0, validades = 0;
+  for (const sub of Object.values(db.subempreiteiros)) {
+    for (const [docKey, lista] of Object.entries(sub.docs || {})) {
+      if (!isEmpresaDocKey(docKey)) continue;
+      for (const entrada of lista || []) {
+        const filePath = ficheiroPath(empresaDir(sub.id), docKey, entrada.id, entrada.ext);
+        if (!fs.existsSync(filePath)) continue;
+        ficheiros++;
+        const resultado = await analisarDocumentoEmpresa(filePath, entrada.ext, docKey);
+        if (resultado.avisoTipo) { entrada.avisoTipo = resultado.avisoTipo; avisos++; }
+        if (resultado.dataValidade && !entrada.dataValidade) { entrada.dataValidade = resultado.dataValidade; validades++; }
+      }
+    }
+  }
+  db.migracoes.reanaliseDocsV1 = true;
+  writeDb(db);
+  console.log(`[arranque] Reanálise de documentos existentes: ${ficheiros} ficheiro(s) visto(s), ${avisos} aviso(s) de tipo, ${validades} data(s) de validade preenchida(s).`);
 }
 
 // ---------- App ----------
@@ -470,8 +531,7 @@ app.post('/api/docs/:docKey', exigirSubempreiteiro, assignFileId, (req, res) => 
     const sub = db.subempreiteiros[req.subempreiteiroId];
     if (!Array.isArray(sub.docs[docKey])) sub.docs[docKey] = [];
     const entrada = { id: req.fileId, originalName: req.file.originalname, ext: path.extname(req.file.originalname).toLowerCase(), uploadedAt: new Date().toISOString() };
-    const classificacao = await tentarClassificarDocumento(req.file.path, entrada.ext, docKey);
-    if (!classificacao.ok) entrada.avisoTipo = classificacao.tipoSugerido;
+    Object.assign(entrada, await analisarDocumentoEmpresa(req.file.path, entrada.ext, docKey));
     sub.docs[docKey].push(entrada);
     if (sub.rejeicoesDocs) delete sub.rejeicoesDocs[docKey];
     writeDb(db);
@@ -496,8 +556,7 @@ app.post('/api/docs/:docKey/:fileId', exigirSubempreiteiro, (req, res) => {
     const novaExt = path.extname(req.file.originalname).toLowerCase();
     if (entradaAntiga.ext !== novaExt) fs.rm(ficheiroPath(empresaDir(req.subempreiteiroId), docKey, fileId, entradaAntiga.ext), { force: true }, () => {});
     const novaEntrada = { id: fileId, originalName: req.file.originalname, ext: novaExt, uploadedAt: new Date().toISOString() };
-    const classificacao = await tentarClassificarDocumento(req.file.path, novaExt, docKey);
-    if (!classificacao.ok) novaEntrada.avisoTipo = classificacao.tipoSugerido;
+    Object.assign(novaEntrada, await analisarDocumentoEmpresa(req.file.path, novaExt, docKey));
     lista2[idx] = novaEntrada;
     if (sub2.rejeicoesDocs) delete sub2.rejeicoesDocs[docKey];
     writeDb(db2);
@@ -850,4 +909,5 @@ app.get('*', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  Portal de Parceiros AURUM a correr em http://localhost:${PORT}\n`);
+  reanalisarDocsExistentes().catch((e) => console.warn('[arranque] Reanálise de documentos falhou:', e.message));
 });

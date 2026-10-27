@@ -19,17 +19,18 @@ const EMPRESA_DOCS = [
 
 const MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-// Documentos mensais (declaração de remunerações, TSU) referem-se ao mês anterior até este
-// dia do mês — o contabilista só costuma ter estes documentos prontos depois de o mês
-// fechar. A partir deste dia, já se pede o do mês atual.
-const DIA_TROCA_MES_DOCS_MENSAIS = 20;
+// Os documentos mensais (declaração de remunerações, TSU) do mês M só são pedidos a partir
+// do dia 12 do mês M+1 — o contabilista só os tem prontos depois de o mês fechar. Até esse
+// dia ainda se pede o do mês anterior (ex: a 27/10 pede-se o de setembro; o de outubro só a
+// partir de 12/11). Mesma regra da Gestão Documental (DIA_INICIO_RENOVACAO_MENSAL).
+const DIA_TROCA_MES_DOCS_MENSAIS = 12;
 
 // Devolve o rótulo do documento, com o mês incluído para os documentos mensais
-// (ex: "Declaração de Remunerações de junho"). Os restantes documentos ficam inalterados.
+// (ex: "Declaração de Remunerações de setembro"). Os restantes documentos ficam inalterados.
 function labelDocEmpresa(tipo, hoje) {
   if (!tipo.mensal) return tipo.label;
-  const mesAtual = hoje.getMonth();
-  const mes = hoje.getDate() >= DIA_TROCA_MES_DOCS_MENSAIS ? mesAtual : (mesAtual + 11) % 12;
+  const recuo = hoje.getDate() >= DIA_TROCA_MES_DOCS_MENSAIS ? 1 : 2;
+  const mes = (hoje.getMonth() - recuo + 12) % 12;
   return `${tipo.label} de ${MESES_PT[mes]}`;
 }
 

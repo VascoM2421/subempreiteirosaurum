@@ -81,11 +81,16 @@ function hashPassword(password) {
   return { salt, hash };
 }
 function verifyPassword(password, salt, hash) {
-  const tentativa = crypto.scryptSync(password, salt, 64).toString('hex');
+  const tentativa = crypto.scryptSync(String(password), salt, 64).toString('hex'); // String(...) evita 500 com password não-string
   const a = Buffer.from(tentativa, 'hex');
   const b = Buffer.from(hash, 'hex');
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+// Hash "chamariz": faz o login de um username inexistente correr scrypt na mesma,
+// para o tempo de resposta não revelar que utilizadores existem (anti-enumeração).
+const DUMMY_SALT = crypto.randomBytes(16).toString('hex');
+const DUMMY_HASH = crypto.scryptSync('x', DUMMY_SALT, 64).toString('hex');
 
 // ---------- Protecao contra forca-bruta nos logins (em memoria, por IP) ----------
 const LOGIN_JANELA_MS = 15 * 60 * 1000;
@@ -522,7 +527,7 @@ app.post('/api/login', limitarLogin, (req, res) => {
   const entrada = Object.entries(db.subempreiteiros).find(
     ([, s]) => s.username && s.username.toLowerCase() === String(username).toLowerCase(),
   );
-  if (!entrada) { registarFalhaLogin(req); return res.status(401).json({ erro: 'Utilizador ou password inválidos.' }); }
+  if (!entrada) { verifyPassword(password, DUMMY_SALT, DUMMY_HASH); registarFalhaLogin(req); return res.status(401).json({ erro: 'Utilizador ou password inválidos.' }); }
   const [id, sub] = entrada;
   if (!sub.ativo) return res.status(401).json({ erro: 'Conta desativada. Contacta a AURUM.' });
   if (!verifyPassword(password, sub.salt, sub.passwordHash)) {
